@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#101216">
+  <title>电脑控制器</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.mjs"></script>
+</head>
+<body>
+  <main id="app" class="shell">
+    <span id="status" class="sr-only" role="status">等待配对</span>
+
+    <div id="notice" class="notice" role="alert" hidden>
+      <span id="notice-text"></span>
+      <button id="notice-close" aria-label="关闭提示">×</button>
+    </div>
+
+    <section id="pairing" class="connect-screen">
+      <h1>连接电脑</h1>
+      <label for="pair-link">配对链接</label>
+      <input id="pair-link" type="text" autocomplete="off" spellcheck="false" placeholder="http://电脑地址:8787/#pair=…">
+      <button id="pair-button" class="primary">配对并连接</button>
+      <p class="hint">HTTP 未加密，仅用于可信 Wi-Fi。</p>
+    </section>
+
+    <section id="resume" class="connect-screen" hidden>
+      <h1>控制已暂停</h1>
+      <button id="reconnect" class="primary">重新连接</button>
+    </section>
+
+    <div id="controls" hidden>
+      <div class="workspace">
+        <section id="panel-input" class="input-panel" role="tabpanel" aria-labelledby="tab-input" data-panel="input">
+          <label for="text" class="sr-only">发送到电脑的文本</label>
+          <textarea id="text" rows="2" placeholder="输入…" maxlength="16384" enterkeyhint="enter" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"></textarea>
+          <span id="text-count" class="text-count" hidden>0 B</span>
+          <span id="input-result" class="sr-only" role="status"></span>
+          <div class="send-actions">
+            <button id="hide-keyboard" class="icon-button" aria-label="收起键盘" title="收起键盘"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+            <button id="send-text" disabled><span>发送</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button>
+            <button id="send-enter" class="primary" aria-label="发送并回车" disabled><span>发送并回车</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 5v8H4m5-5-5 5 5 5"/></svg></button>
+          </div>
+        </section>
+
+        <section id="panel-control" class="control-panel" role="tabpanel" aria-labelledby="tab-control" data-panel="control" hidden>
+          <div class="navigation">
+            <div class="side-keys"><button data-key="41">Esc</button><button data-key="74">Home</button><button data-key="77">End</button></div>
+            <div class="arrows">
+              <button data-key="82" class="up" aria-label="向上">↑</button>
+              <button data-key="80" class="left" aria-label="向左">←</button>
+              <button data-key="81" class="down" aria-label="向下">↓</button>
+              <button data-key="79" class="right" aria-label="向右">→</button>
+            </div>
+            <div class="side-keys"><button data-key="43">Tab</button><button data-key="75">PgUp</button><button data-key="78">PgDn</button></div>
+          </div>
+          <div class="control-tools">
+            <button data-key="44" class="space">空格</button>
+            <div id="modifiers" class="key-strip" aria-label="修饰键，点击保持，再次点击释放"></div>
+            <div class="key-strip shortcuts" aria-label="快捷键">
+              <button data-shortcut="copy">复制</button><button data-shortcut="paste">粘贴</button>
+              <button data-shortcut="select">全选</button><button data-shortcut="redo">重做</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="panel-keyboard" class="keyboard-panel" role="tabpanel" aria-labelledby="tab-keyboard" data-panel="keyboard" hidden>
+          <div class="mini-touchpad">
+            <div id="keyboard-touchpad" class="touchpad" role="application" tabindex="0" aria-label="键盘上方触控板"></div>
+            <div class="mouse-buttons"><button data-mouse="1" aria-label="左键，按住拖拽">左键</button><button data-mouse="2">右键</button></div>
+          </div>
+          <div id="full-keyboard"></div>
+        </section>
+
+        <section id="panel-aux" class="aux-panel" role="tabpanel" aria-labelledby="tab-aux" data-panel="aux" hidden>
+          <div id="aux-keyboard"></div>
+        </section>
+
+        <section id="panel-touchpad" class="touchpad-panel" role="tabpanel" aria-labelledby="tab-touchpad" data-panel="touchpad" hidden>
+          <div id="touchpad" class="touchpad" role="application" tabindex="0" aria-label="电脑触控板"></div>
+          <div class="mouse-buttons">
+            <button data-mouse="1" aria-label="左键，按住拖拽">左键</button>
+            <button id="mouse-double" data-mouse-click="double">双击</button>
+            <button data-mouse="2">右键</button>
+          </div>
+        </section>
+      </div>
+
+      <nav class="action-dock" aria-label="电脑常用操作">
+        <button data-shortcut="undo" class="undo" aria-label="电脑撤销"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 10H4V5m0 5 4-4a7 7 0 1 1-1 10"/></svg><span>撤销</span></button>
+        <button data-key="42" aria-label="电脑退格"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h11v14H9l-7-7 7-7Zm4 4 5 6m0-6-5 6"/></svg><span>退格</span></button>
+        <button data-key="40" class="enter" aria-label="电脑回车"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 5v8H4m5-5-5 5 5 5"/></svg><span>回车</span></button>
+      </nav>
+    </div>
+
+    <div class="float-bar" aria-label="控制工具栏">
+      <button id="settings-open" class="icon-button" aria-label="设置" title="设置">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg>
+        <span id="status-dot" class="status-dot" data-state="idle" role="img" aria-label="等待配对" title="等待配对"></span>
+      </button>
+      <nav class="tabs" role="tablist" aria-label="控制模式">
+        <button id="tab-input" role="tab" aria-label="文本输入" aria-controls="panel-input" aria-selected="true" data-mode="input"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6V4h14v2M12 4v16M8 20h8"/></svg><span>输入</span></button>
+        <button id="tab-keyboard" role="tab" aria-label="键盘" aria-controls="panel-keyboard" aria-selected="false" tabindex="-1" data-mode="keyboard"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10"/></svg><span>键盘</span></button>
+        <button id="tab-aux" role="tab" aria-label="导航和数字键盘" aria-controls="panel-aux" aria-selected="false" tabindex="-1" data-mode="aux"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="3"/><path d="M8 6h8M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01M8 18h4M16 18h.01"/></svg><span>数字</span></button>
+        <button id="tab-touchpad" role="tab" aria-label="触控板" aria-controls="panel-touchpad" aria-selected="false" tabindex="-1" data-mode="touchpad"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M3 16h18M12 16v5"/></svg><span>触控</span></button>
+        <button id="tab-control" role="tab" aria-label="快捷键" aria-controls="panel-control" aria-selected="false" tabindex="-1" data-mode="control"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v10a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V7Z"/></svg><span>快捷</span></button>
+      </nav>
+      <button id="release" class="release" disabled title="释放所有按键" aria-label="释放所有按键">释放</button>
+    </div>
+
+    <dialog id="settings" aria-labelledby="settings-title">
+      <div class="dialog-heading"><h2 id="settings-title">设置</h2><button id="settings-close" class="icon-button" aria-label="关闭设置">×</button></div>
+      <dl class="connection-details">
+        <div><dt>连接</dt><dd id="connection-detail">未连接</dd></div>
+        <div><dt>RTT</dt><dd><span id="latency">—</span> ms</dd></div>
+      </dl>
+      <div class="signal-legend"><span class="stable">稳定</span><span class="unstable">波动 / 连接中</span><span class="poor">较差 / 断开</span></div>
+      <div class="setting-row"><label for="platform">快捷键目标系统</label><select id="platform"><option value="auto">自动识别</option><option value="macos">macOS</option><option value="windows">Windows</option></select></div>
+      <p class="hint">HTTP 未加密，仅用于可信 Wi-Fi。</p>
+      <button id="forget" class="danger" hidden>忘记此配对</button>
+    </dialog>
+  </main>
+</body>
+</html>
