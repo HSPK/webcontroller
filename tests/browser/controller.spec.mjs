@@ -87,16 +87,30 @@ test("phone UI is one screen in portrait, landscape and reduced keyboard space",
     { width: 390, height: 280 },
   ]) {
     await page.setViewportSize(size);
-    for (const mode of ["input", "control", "keyboard", "aux", "touchpad"]) {
+    for (const mode of ["input", "control", "keyboard", "aux", "touchpad", "remote"]) {
       await page.locator(`[data-mode="${mode}"]`).click();
       await assertFits(page);
+      if (mode === "remote") {
+        const geometry = await page.locator(".remote-dpad").evaluate((element) => {
+          const ring = element.getBoundingClientRect();
+          return {
+            difference: Math.abs(ring.width - ring.height),
+            targets: [...element.querySelectorAll("button")].map((button) => {
+              const rect = button.getBoundingClientRect();
+              return Math.min(rect.width, rect.height);
+            }),
+          };
+        });
+        expect(geometry.difference).toBeLessThanOrEqual(1);
+        expect(Math.min(...geometry.targets)).toBeGreaterThanOrEqual(44);
+      }
     }
   }
 });
 
 test("one floating bar controls every mode and leaves most space for input in both orientations", async ({ page }) => {
   await expect(page.getByRole("tablist")).toHaveCount(1);
-  await expect(page.locator(".float-bar [role=tab]")).toHaveCount(5);
+  await expect(page.locator(".float-bar [role=tab]")).toHaveCount(6);
   for (const size of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(size);
     await page.locator("#tab-input").click();
@@ -114,6 +128,58 @@ test("one floating bar controls every mode and leaves most space for input in bo
   await expect(page.locator("#tab-aux")).toHaveAttribute("aria-selected", "true");
   await page.locator("#tab-aux").press("ArrowRight");
   await expect(page.locator("#tab-touchpad")).toHaveAttribute("aria-selected", "true");
+});
+
+test("TV remote sends one atomic action per tap and respects held modifiers", async ({ page }) => {
+  await page.locator("#tab-remote").click();
+  await expect(page.locator("#panel-remote")).toBeVisible();
+  for (const key of [40, 41, 74, 101, 44, 80, 79, 75, 78]) {
+    const before = sent().length;
+    await page.locator(`#panel-remote [data-tap-key="${key}"]`).tap();
+    await expect.poll(() => sent().length).toBe(before + 1);
+    expect(sent().at(-1)).toMatchObject({ opcode: 6, keys: [key] });
+  }
+  await page.locator("#tab-control").click();
+  await page.locator('#modifiers [data-modifier="224"]').tap();
+  await page.locator("#tab-remote").click();
+  const before = sent().length;
+  await page.locator(".remote-ok").tap();
+  await expect(page.locator("#notice-text")).toContainText("请先释放所有按键");
+  expect(sent()).toHaveLength(before);
+  await expect(page.locator("#status")).toHaveText("已连接电脑");
+  await page.locator("#release").tap();
+  await page.locator(".remote-ok").press("Enter");
+  await expect.poll(() => sent().at(-1)).toMatchObject({ opcode: 6, keys: [40] });
+});
+
+test("TV remote playback does not repeat while held and directions release on mode changes", async ({ page }) => {
+  await page.locator("#tab-remote").click();
+  const playback = await page.locator('#panel-remote [data-tap-key="44"]').boundingBox();
+  await page.mouse.move(playback.x + playback.width / 2, playback.y + playback.height / 2);
+  await page.mouse.down();
+  await expect.poll(() => sent().length).toBe(1);
+  expect(sent()[0]).toMatchObject({ opcode: 6, keys: [44] });
+  await page.waitForTimeout(550);
+  await page.mouse.up();
+  expect(sent()).toHaveLength(1);
+  const ring = await page.locator(".remote-dpad").boundingBox();
+  for (const [key, x, y] of [[82, 0.28, 0.16], [80, 0.16, 0.72], [81, 0.72, 0.84], [79, 0.84, 0.28]]) {
+    await page.mouse.move(ring.x + ring.width * x, ring.y + ring.height * y);
+    await page.mouse.down();
+    await expect.poll(() => sent().at(-1)).toMatchObject({ opcode: 1, keys: [key] });
+    await page.mouse.up();
+    await expect.poll(() => sent().at(-1)).toMatchObject({ opcode: 2, keys: [key] });
+  }
+  const up = await page.locator(".remote-up").boundingBox();
+  await page.mouse.move(up.x + up.width / 2, up.y + up.height / 2);
+  await page.mouse.down();
+  await expect(page.locator(".remote-up")).toHaveClass(/pressed/);
+  expect(sent().at(-1)).toMatchObject({ opcode: 1, keys: [82] });
+  await page.locator("#tab-keyboard").press("Enter");
+  await expect.poll(() => sent().at(-1)).toMatchObject({ opcode: 2, keys: [82] });
+  await page.mouse.up();
+  await expect(page.locator("#release")).toHaveText("释放");
+  await expect(page.locator("#status")).toHaveText("已连接电脑");
 });
 
 test("the status dot distinguishes stable, slow, poor and disconnected connections", async ({ page }) => {
@@ -548,6 +614,25 @@ test("touchpad taps, relative motion and explicit double click send real control
   expect(await page.evaluate(() => scrollY)).toBe(0);
 });
 
+test("movement and scrolling reach the transport without waiting for a display frame", async ({ page }) => {
+  await page.locator("#tab-touchpad").click();
+  await page.evaluate(() => {
+    window.requestAnimationFrame = () => 1;
+    window.cancelAnimationFrame = () => {};
+  });
+  const pad = page.locator("#touchpad");
+  const bounds = await pad.boundingBox();
+  await page.mouse.move(bounds.x + 60, bounds.y + 60);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + 80, bounds.y + 60);
+  await expect.poll(() => sent().some((entry) => entry.opcode === 7)).toBe(true);
+  await page.mouse.up();
+  await pad.dispatchEvent("wheel", { deltaY: 12 });
+  await expect.poll(() => sent().some((entry) => entry.opcode === 10)).toBe(true);
+  expect(sent().find((entry) => entry.opcode === 7).delta).toEqual([30, 0]);
+  expect(sent().find((entry) => entry.opcode === 10).delta).toEqual([0, 12]);
+});
+
 test("pointer motion does not rewrite keyboard controls or text counters", async ({ page }) => {
   await page.locator("#tab-touchpad").click();
   await page.evaluate(() => {
@@ -709,7 +794,7 @@ test("separate mouse buttons flush the other finger's final motion before releas
   const pad = await page.locator("#touchpad").boundingBox();
   const first = { x: button.x + button.width / 2, y: button.y + button.height / 2, id: 1 };
   const second = { x: pad.x + 80, y: pad.y + 80, id: 2 };
-  // Hold animation-frame delivery so the final gesture must flush at the button boundary.
+  // Stalled rendering must not delay motion or reorder the button boundary.
   await page.evaluate(() => {
     window.requestAnimationFrame = () => 1;
     window.cancelAnimationFrame = () => {};

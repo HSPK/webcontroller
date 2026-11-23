@@ -47,7 +47,7 @@ One Rust binary on your computer. A browser on your phone. Nothing in between.
 | **Real desktop input** | Native CoreGraphics on macOS and `SendInput` on Windows—not a browser-only simulation. |
 | **Mobile ergonomics** | Bottom-anchored QWERTY in portrait; a complete ANSI layout in landscape. |
 | **Your own input method** | Compose locally with the phone's keyboard and IME, then commit Unicode text explicitly. |
-| **Low overhead** | Binary commands, frame-coalesced motion, a dedicated native input thread, and bounded queues. |
+| **Low overhead** | Immediate first motion, 4 ms micro-batching, binary commands, and a dedicated native input thread. |
 | **Predictable recovery** | Exclusive ownership, an independent input lease, explicit errors, and no reconnect replay. |
 | **A small footprint** | HTML, CSS, and ES modules embedded in one Rust binary. Node.js is only for development. |
 
@@ -110,7 +110,7 @@ cannot guarantee delivery of release events to the OS.
 
 ## The controls
 
-One floating bar. Five workspaces. No nested mode tabs.
+One floating bar. Six workspaces. No nested mode tabs.
 
 | Workspace | Interaction |
 | :--- | :--- |
@@ -119,10 +119,33 @@ One floating bar. Five workspaces. No nested mode tabs.
 | **Numeric** | Navigation cluster and numpad, with double-height Plus/Enter and double-width zero. |
 | **Touchpad** | Relative movement, clicks, two-finger scrolling, and dragging. |
 | **Shortcuts** | Arrows, navigation, sticky modifiers, copy/paste/select/redo, and Space. |
+| **TV remote** | A directional ring with OK, Back, Home, Menu, playback/navigation controls, and page buttons; side-by-side in compact layouts. |
 
 **Undo, Backspace, and Enter always target the computer**, not the local draft.
 An emergency **Release** clears owned keys and mouse buttons. Shortcuts automatically
 choose Command on macOS or Control on Windows, with a manual override in Settings.
+
+### TV-style remote
+
+<p align="center">
+  <img src="docs/images/tv-remote.png" width="320" alt="TV-style remote with a directional ring and playback controls">
+</p>
+
+The **Remote** workspace controls the connected computer, not a television through
+IR, HDMI-CEC, or a smart-TV API. Its keyboard mappings are:
+
+| Control | Computer key |
+| :--- | :--- |
+| Directional ring / OK | Arrow keys / Enter |
+| Back / Home / Menu | Esc / Home / Application (Menu) |
+| Playback / backward / forward | Space / Left / Right |
+| Previous / next page | Page Up / Page Down |
+
+Directions support hold-to-repeat and release when switching workspaces. Other
+remote controls send a single press/release immediately on touch-down, without
+repeating during a hold. Release held keys or mouse buttons before using them.
+Playback, navigation, and Menu behavior depend on the focused application;
+these are not global media keys or a TV home-screen command.
 
 ### Touchpad gestures
 
@@ -136,8 +159,16 @@ choose Command on macOS or Control on Windows, with a manual override in Setting
 | Hold the separate left/right button and move | Drag with an explicit mouse button |
 | Tap **Double click** | A left-button double click |
 
-Touch movement is accumulated per animation frame and flushed before mouse-button
-boundaries. Lifting one finger after scrolling does not turn the remaining finger
+Motion starts immediately after gesture recognition, without waiting for the
+next display frame. Subsequent updates are combined on a **4 ms scheduling budget**
+with at most **two automatically sent motion commands awaiting ACK** per touchpad.
+When capacity is exhausted, deltas accumulate locally and resume as soon as an ACK
+frees capacity, rather than building a long sequence of stale movement packets.
+Button boundaries force the final pending motion out before click/release commands;
+this flush can temporarily exceed the automatic motion window to preserve ordering.
+Browser/OS scheduling can delay timers; this is not a hard real-time guarantee.
+
+Lifting one finger after scrolling does not turn the remaining finger
 into a cursor movement or an accidental click. Desktop wheel events also scroll
 the remote computer. Pressing the surface does not highlight the whole region.
 
@@ -210,7 +241,9 @@ flowchart LR
 
 The browser is dependency-free at runtime. Native input is serialized on one
 dedicated thread with bounded channels. Key/button boundaries are sent immediately;
-motion is coalesced without repeatedly rewriting keyboard controls or re-encoding drafts.
+motion is micro-batched independently of painting, without repeatedly rewriting
+keyboard controls or re-encoding drafts. Fixed-size commands encode directly into
+one frame buffer; touch contact coordinates are updated in place.
 
 <details>
 <summary><b>Ordering, leases, and performance engineering</b></summary>
@@ -229,6 +262,12 @@ motion is coalesced without repeatedly rewriting keyboard controls or re-encodin
   invalid frames end the connection. Commands are never replayed on reconnect.
 - Shortcuts are ordered single commands. Final motion is flushed before button
   release, preserving the end of a drag.
+- Accepted server sockets and outbound daemon connections enable **TCP_NODELAY**,
+  avoiding Nagle delays on small control/ACK packets. A TLS proxy has its own
+  transport/buffering settings and must be configured separately.
+- The macOS native input thread requests **user-interactive QoS** to prioritize
+  input work under contention. It still blocks when idle; no real-time scheduling,
+  busy-waiting, or process-wide priority changes are used. QoS failures are logged.
 - ACK means the adapter completed its system API calls—not that the target
   application accepted or rendered the input. Exactly-once execution is not claimed.
 
@@ -240,9 +279,17 @@ motion is coalesced without repeatedly rewriting keyboard controls or re-encodin
 npm run bench
 ```
 
-The opt-in benchmark builds release, measures **500 sequential movement ACKs**, and
-counts DOM writes during **60 frame-paced touchpad movements**. It warms up and
-stops its own loopback-only dry-run fixtures without restarting an existing controller.
+The opt-in benchmark builds release and reports:
+
+- **500 sequential movement ACKs** and **400 burst ACKs** with an eight-command window.
+- Browser pointer-event-to-`WebSocket.send` delay during **60 frame-paced movements**,
+  alongside keyboard/text-counter DOM-write counts.
+- A separate **120-event synthetic wheel stream** at 4 ms intervals to expose
+  scheduling delays independently of Chromium's frame-aligned pointer delivery.
+
+It warms up and stops its own loopback-only dry-run fixtures without restarting
+an existing controller. The synthetic stream measures the actual controller
+handler/send path, not a physical phone's touch sampling or native injection.
 
 > [!NOTE]
 > Benchmark p50/p95/p99 measure local transport/UI overhead—not real Wi-Fi,

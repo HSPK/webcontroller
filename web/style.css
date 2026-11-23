@@ -55,7 +55,7 @@ svg { width: 18px; height: 18px; flex-shrink: 0; fill: none; stroke: currentColo
   grid-template-rows: minmax(0, 1fr) 56px;
   gap: 8px;
 }
-.float-bar { grid-row: 2; justify-self: center; width: 100%; max-width: 408px; display: grid; grid-template-columns: 40px minmax(0, 1fr) 40px; align-items: stretch; gap: 4px; padding: 5px; background: #1a1e24; border: 1px solid #383e48; border-radius: 12px; box-shadow: inset 0 1px 0 #ffffff06, 0 8px 24px #0004; }
+.float-bar { grid-row: 2; justify-self: center; width: 100%; max-width: 456px; display: grid; grid-template-columns: 40px minmax(0, 1fr) 40px; align-items: stretch; gap: 4px; padding: 5px; background: #1a1e24; border: 1px solid #383e48; border-radius: 12px; box-shadow: inset 0 1px 0 #ffffff06, 0 8px 24px #0004; }
 .status-dot { position: absolute; top: 6px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: currentColor; color: #829099; box-shadow: 0 0 0 3px var(--surface); }
 .status-dot[data-state="stable"], .stable { color: var(--success); }
 .status-dot[data-state="connecting"], .status-dot[data-state="unstable"], .unstable { color: var(--warning); }
@@ -89,7 +89,7 @@ textarea.over-limit { border-color: var(--danger); }
 .action-dock .enter svg { color: #b3c5df; }
 .action-dock button.pressed { background: #35445a; border-color: #7288a7; color: #edf3fc; box-shadow: inset 0 1px 3px #0005; }
 .action-dock button:disabled { color: #626c7a; }
-.action-dock button, [data-key], [data-modifier], [data-shortcut] { user-select: none; -webkit-user-select: none; touch-action: none; }
+.action-dock button, [data-key], [data-tap-key], [data-modifier], [data-shortcut] { user-select: none; -webkit-user-select: none; touch-action: none; }
 .control-panel { display: flex; flex-direction: column; gap: 8px; }
 .navigation { min-height: 0; flex: 1; display: grid; grid-template-columns: 1fr 2.7fr 1fr; gap: 8px; }
 .side-keys { display: grid; grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 6px; }
@@ -149,6 +149,23 @@ textarea.over-limit { border-color: var(--danger); }
 .mouse-buttons { min-height: 0; display: flex; gap: 6px; }
 .mouse-buttons button { flex: 1; min-height: 0; padding: 4px; font-size: 11px; color: #b1bac8; touch-action: none; user-select: none; -webkit-user-select: none; }
 .mouse-buttons button.pressed { color: #edf3fc; }
+.remote-panel { display: grid; place-items: center; }
+.remote-body { min-width: 0; min-height: 0; width: 100%; height: 100%; max-width: 400px; max-height: 560px; display: grid; grid-template-rows: minmax(0, 1fr) 148px; gap: 16px; }
+.remote-navigation { min-width: 0; min-height: 0; display: grid; place-items: center; }
+.remote-dpad { position: relative; min-width: 0; min-height: 0; height: min(100%, 280px); max-width: 100%; aspect-ratio: 1; border: 1px solid #414b59; border-radius: 50%; background: linear-gradient(160deg, #252c36, #1b2028); box-shadow: inset 0 1px 0 #ffffff0a, 0 6px 18px #0003; overflow: hidden; }
+.remote-dpad button { position: absolute; min-height: 0; padding: 3px; display: grid; place-items: center; border-color: transparent; border-radius: 0; background: transparent; box-shadow: none; }
+.remote-dpad svg { width: 24px; height: 24px; }
+.remote-up { inset: 0 0 auto; height: 50%; clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.remote-left { inset: 0 auto 0 0; width: 50%; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+.remote-right { inset: 0 0 0 auto; width: 50%; clip-path: polygon(100% 0, 0 50%, 100% 100%); }
+.remote-down { inset: auto 0 0; height: 50%; clip-path: polygon(0 100%, 50% 0, 100% 100%); }
+.remote-dpad .remote-ok { z-index: 1; top: 50%; left: 50%; width: 32%; height: 32%; transform: translate(-50%, -50%); border-radius: 50%; background: #303e53; border-color: #526680; color: #e1e9f5; font-size: 17px; font-weight: 550; }
+.remote-dpad button:is(.pressed, :active):not(:disabled) { background: #35445a; border-color: #7288a7; }
+.remote-controls { min-width: 0; min-height: 0; height: 148px; max-height: 100%; align-self: center; display: grid; grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.remote-top, .remote-media, .remote-pages { min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.remote-pages { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.remote-controls button { padding: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 11px; }
+.remote-panel button:disabled { color: #626c7a; background: #1b1f26; border-color: #292e36; box-shadow: none; }
 .connect-screen { grid-row: 1; grid-column: 1; min-height: 0; align-self: center; display: grid; gap: 12px; width: 100%; max-width: 440px; justify-self: center; }
 h1 { margin: 0; font-size: 20px; font-weight: 500; letter-spacing: -.02em; }
 h2 { margin: 0; font-size: 16px; font-weight: 500; }
@@ -185,6 +202,9 @@ dialog::backdrop { background: #000a; }
 [data-compact="true"] .keyboard-panel { grid-template-rows: minmax(0, 1fr); gap: 4px; }
 [data-compact="true"] .mini-touchpad { display: none; }
 [data-compact="true"] .touchpad-panel { gap: 4px; }
+[data-compact="true"] .remote-body { max-width: 680px; max-height: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
+[data-compact="true"] .remote-dpad { height: min(100%, 280px, 44vw); }
+[data-compact="true"] .remote-dpad svg { width: 20px; height: 20px; }
 [data-compact="true"] .connect-screen { gap: 7px; }
 [data-compact="true"] .connect-screen h1 { font-size: 18px; }
 [data-compact="true"] .connect-screen .hint { font-size: 10px; }

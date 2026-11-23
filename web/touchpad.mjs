@@ -1,3 +1,6 @@
+const MOTION_INTERVAL_MS = 4;
+const MAX_MOTION_IN_FLIGHT = 2;
+
 export class Touchpad {
   constructor(element, { send, enabled, held, error }) {
     this.element = element;
@@ -8,7 +11,10 @@ export class Touchpad {
     this.points = new Map();
     this.pending = [0, 0];
     this.pendingKind = null;
-    this.frame = null;
+    this.flushTimer = null;
+    this.lastSent = -Infinity;
+    this.motionInFlight = 0;
+    this.generation = 0;
     this.timer = null;
     this.dragging = false;
     this.gesture = null;
@@ -50,10 +56,24 @@ export class Touchpad {
 
   dispatch(kind, value) {
     if (!this.enabled()) return;
-    this.send(kind, value).catch((error) => {
-      this.cancel(false);
-      this.error(error);
-    });
+    const motion = kind === "move" || kind === "scroll";
+    const generation = this.generation;
+    if (motion) this.motionInFlight++;
+    this.send(kind, value).then(
+      () => {
+        if (motion) {
+          this.motionInFlight--;
+          this.schedule();
+        }
+      },
+      (error) => {
+        if (motion) this.motionInFlight--;
+        // A cancelled gesture must not tear down a newer session; transport failures are already surfaced there.
+        if (generation !== this.generation) return;
+        this.cancel(false);
+        this.error(error);
+      },
+    );
   }
 
   center() {
@@ -92,7 +112,11 @@ export class Touchpad {
     // Touch Events provide the complete contact set; update it atomically before measuring the centroid.
     for (const touch of event.touches) {
       const id = `touch:${touch.identifier}`;
-      if (this.points.has(id)) this.points.set(id, { x: touch.clientX, y: touch.clientY });
+      const point = this.points.get(id);
+      if (point) {
+        point.x = touch.clientX;
+        point.y = touch.clientY;
+      }
     }
     if (this.points.size) this.moved();
   }
@@ -129,9 +153,11 @@ export class Touchpad {
   }
 
   move(event) {
-    if (!this.points.has(event.pointerId) || !this.gesture) return;
+    const point = this.points.get(event.pointerId);
+    if (!point || !this.gesture) return;
     event.preventDefault();
-    this.points.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    point.x = event.clientX;
+    point.y = event.clientY;
     this.moved();
   }
 
@@ -151,7 +177,8 @@ export class Touchpad {
     }
     dx += this.gesture.suppressed[0];
     dy += this.gesture.suppressed[1];
-    this.gesture.suppressed = [0, 0];
+    this.gesture.suppressed[0] = 0;
+    this.gesture.suppressed[1] = 0;
     const scroll = this.gesture.fingers === 2;
     const scale = scroll ? -1 : 1.5;
     this.queue(scroll ? "scroll" : "move", dx * scale, dy * scale);
@@ -165,20 +192,35 @@ export class Touchpad {
     this.pendingKind = kind;
     this.pending[0] += x;
     this.pending[1] += y;
-    if (this.frame === null) this.frame = requestAnimationFrame(() => this.flush());
+    this.schedule();
   }
 
-  flush() {
-    if (this.frame !== null) cancelAnimationFrame(this.frame);
-    this.frame = null;
+  schedule() {
+    if (!this.enabled() || this.flushTimer !== null || this.motionInFlight >= MAX_MOTION_IN_FLIGHT
+        || (Math.abs(this.pending[0]) < 1 && Math.abs(this.pending[1]) < 1)) return;
+    const delay = Math.max(0, MOTION_INTERVAL_MS - (performance.now() - this.lastSent));
+    if (delay === 0) this.flush(false);
+    else this.flushTimer = setTimeout(() => this.flush(false), delay);
+  }
+
+  flush(force = true) {
+    if (this.flushTimer !== null) clearTimeout(this.flushTimer);
+    this.flushTimer = null;
     if (!this.pendingKind) return;
-    // Flush motion before button boundaries so a drag's final movement is not reordered.
-    while (Math.abs(this.pending[0]) >= 1 || Math.abs(this.pending[1]) >= 1) {
-      const delta = this.pending.map((value) => Math.max(-4096, Math.min(4096, Math.trunc(value))));
+    // Button boundaries force the final motion out before the button command, even under backpressure.
+    while ((Math.abs(this.pending[0]) >= 1 || Math.abs(this.pending[1]) >= 1)
+        && (force || this.motionInFlight < MAX_MOTION_IN_FLIGHT)) {
+      const delta = [
+        Math.max(-4096, Math.min(4096, Math.trunc(this.pending[0]))),
+        Math.max(-4096, Math.min(4096, Math.trunc(this.pending[1]))),
+      ];
       this.pending[0] -= delta[0];
       this.pending[1] -= delta[1];
+      this.lastSent = performance.now();
       this.dispatch(this.pendingKind, delta);
+      if (!force) break;
     }
+    this.schedule();
   }
 
   up(event) {
@@ -192,18 +234,23 @@ export class Touchpad {
     else if (!this.held() && this.gesture.distance < 5 && performance.now() - this.gesture.start < 300 && this.gesture.fingers <= 2) {
       this.dispatch("click", [this.gesture.fingers === 2 ? 2 : 1, 1]);
     }
-    this.cancel(false);
+    this.reset();
   }
 
   cancel(release) {
-    clearTimeout(this.timer);
     if (release) this.flush();
-    if (this.frame !== null) cancelAnimationFrame(this.frame);
     if (release && this.dragging) this.dispatch("mouse-up", 1);
+    this.generation++;
+    this.reset();
+  }
+
+  reset() {
+    clearTimeout(this.timer);
+    if (this.flushTimer !== null) clearTimeout(this.flushTimer);
     this.points.clear();
     this.gesture = null;
     this.dragging = false;
-    this.frame = null;
+    this.flushTimer = null;
     this.pending = [0, 0];
     this.pendingKind = null;
     this.element.classList.remove("dragging");

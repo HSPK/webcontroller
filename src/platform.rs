@@ -81,12 +81,38 @@ mod native {
         fn CFRelease(value: *const c_void);
     }
 
+    #[link(name = "System")]
+    unsafe extern "C" {
+        fn pthread_set_qos_class_self_np(class: u32, priority: i32) -> i32;
+        #[cfg(test)]
+        fn pthread_self() -> *mut c_void;
+        #[cfg(test)]
+        fn pthread_get_qos_class_np(
+            thread: *mut c_void,
+            class: *mut u32,
+            priority: *mut i32,
+        ) -> i32;
+    }
+
+    fn request_interactive_qos() -> Result<()> {
+        let status = unsafe { pthread_set_qos_class_self_np(0x21, 0) };
+        ensure!(
+            status == 0,
+            "cannot request interactive input QoS: {}",
+            std::io::Error::from_raw_os_error(status)
+        );
+        Ok(())
+    }
+
     pub fn create() -> Result<Box<dyn Adapter>> {
         // The user-session process, not a system service, must have TCC permission.
         ensure!(
             unsafe { AXIsProcessTrusted() },
             "macOS Accessibility permission is required. Enable this executable/terminal in System Settings > Privacy & Security > Accessibility, then restart. Use --dry-run to preview without injection."
         );
+        if let Err(error) = request_interactive_qos() {
+            tracing::warn!(%error, "native input will use the existing thread QoS");
+        }
         Ok(Box::new(Mac {
             caps_lock: unsafe { CGEventSourceFlagsState(1) } & (1 << 16) != 0,
         }))
@@ -269,6 +295,23 @@ mod native {
     #[cfg(test)]
     mod tests {
         use super::*;
+
+        #[test]
+        fn native_input_thread_can_request_interactive_qos() {
+            std::thread::spawn(|| {
+                request_interactive_qos().unwrap();
+                let mut class = 0;
+                let mut priority = 0;
+                assert_eq!(
+                    unsafe { pthread_get_qos_class_np(pthread_self(), &mut class, &mut priority) },
+                    0
+                );
+                assert_eq!(class, 0x21);
+                assert_eq!(priority, 0);
+            })
+            .join()
+            .unwrap();
+        }
 
         #[test]
         fn scroll_events_preserve_both_pixel_axes() {

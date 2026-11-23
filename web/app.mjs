@@ -84,7 +84,7 @@ function updateActions() {
   for (const id of ["send-text", "send-enter"]) {
     $(id).disabled = unavailable || held.size > 0 || mouseHeld.size > 0 || bytes === 0 || bytes > MAX_TEXT_BYTES;
   }
-  document.querySelectorAll("[data-key], [data-key-layer], [data-shortcut], [data-modifier], [data-mouse], [data-mouse-click]").forEach((button) => {
+  document.querySelectorAll("[data-key], [data-tap-key], [data-key-layer], [data-shortcut], [data-modifier], [data-mouse], [data-mouse-click]").forEach((button) => {
     button.disabled = unavailable;
   });
   $("release").disabled = !controller.ready;
@@ -483,17 +483,34 @@ mobileKeyboard.querySelectorAll("[data-key-layer]").forEach((button) => {
 });
 document.querySelectorAll("[data-key]").forEach(bindKey);
 document.querySelectorAll("[data-modifier]").forEach(bindModifier);
+function sendChord(keys) {
+  if (held.size || mouseHeld.size) {
+    notice("请先释放所有按键，再使用此操作。");
+    return;
+  }
+  execute("chord", keys);
+}
+document.querySelectorAll("[data-tap-key]").forEach((button) => {
+  const activate = () => {
+    if (controller.ready && !button.disabled) sendChord([Number(button.dataset.tapKey)]);
+  };
+  button.addEventListener("contextmenu", (event) => event.preventDefault());
+  button.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || button.disabled) return;
+    event.preventDefault();
+    activate();
+  });
+  button.addEventListener("click", (event) => {
+    if (event.detail === 0) activate();
+  });
+});
 document.querySelectorAll("[data-shortcut]").forEach((button) => {
   button.addEventListener("click", () => {
-    if (held.size || mouseHeld.size) {
-      notice("请先释放所有按键，再使用快捷键。");
-      return;
-    }
     const target = $("platform").value === "auto" ? platform : $("platform").value;
     const modifier = target === "macos" ? 227 : 224;
     const kind = button.dataset.shortcut;
     const key = { copy: 6, paste: 25, undo: 29, select: 4, redo: target === "macos" ? 29 : 28 }[kind];
-    execute("chord", kind === "redo" && target === "macos" ? [modifier, 225, key] : [modifier, key]);
+    sendChord(kind === "redo" && target === "macos" ? [modifier, 225, key] : [modifier, key]);
   });
 });
 

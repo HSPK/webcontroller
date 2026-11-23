@@ -85,6 +85,36 @@
             <button data-mouse="2">右键</button>
           </div>
         </section>
+
+        <section id="panel-remote" class="remote-panel" role="tabpanel" aria-labelledby="tab-remote" data-panel="remote" hidden>
+          <div class="remote-body">
+            <div class="remote-navigation">
+              <div class="remote-dpad" role="group" aria-label="方向与确认">
+                <button data-key="82" class="remote-up" aria-label="向上"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg></button>
+                <button data-key="80" class="remote-left" aria-label="向左"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button>
+                <button data-tap-key="40" class="remote-ok" aria-label="确认（回车）" title="Enter">OK</button>
+                <button data-key="79" class="remote-right" aria-label="向右"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+                <button data-key="81" class="remote-down" aria-label="向下"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+              </div>
+            </div>
+            <div class="remote-controls">
+              <div class="remote-top">
+                <button data-tap-key="41" aria-label="返回（Esc）" title="Esc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 5-7 7 7 7M3 12h12a5 5 0 0 1 5 5"/></svg><span>返回</span></button>
+                <button data-tap-key="74" aria-label="Home 键" title="Home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7M5 9v12h5v-7h4v7h5V9"/></svg><span>Home</span></button>
+                <button data-tap-key="101" aria-label="菜单（Application 键）" title="Application / Menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h14"/></svg><span>菜单</span></button>
+              </div>
+              <div class="remote-media">
+                <button data-tap-key="80" aria-label="后退（左方向键）" title="←"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-8 7 8 7V5Zm9 0-8 7 8 7V5Z"/></svg><span>后退</span></button>
+                <button data-tap-key="44" aria-label="播放或暂停（空格）" title="Space"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 4 10 8-10 8V4Zm14 0v16M21 4v16"/></svg><span>播放</span></button>
+                <button data-tap-key="79" aria-label="前进（右方向键）" title="→"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 5 8 7-8 7V5Zm9 0 8 7-8 7V5Z"/></svg><span>前进</span></button>
+              </div>
+              <div class="remote-pages">
+                <button data-tap-key="75" aria-label="上一页（Page Up）" title="Page Up">上一页</button>
+                <button data-tap-key="78" aria-label="下一页（Page Down）" title="Page Down">下一页</button>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
 
       <nav class="action-dock" aria-label="电脑常用操作">
@@ -105,6 +135,7 @@
         <button id="tab-aux" role="tab" aria-label="导航和数字键盘" aria-controls="panel-aux" aria-selected="false" tabindex="-1" data-mode="aux"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="3"/><path d="M8 6h8M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01M8 18h4M16 18h.01"/></svg><span>数字</span></button>
         <button id="tab-touchpad" role="tab" aria-label="触控板" aria-controls="panel-touchpad" aria-selected="false" tabindex="-1" data-mode="touchpad"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M3 16h18M12 16v5"/></svg><span>触控</span></button>
         <button id="tab-control" role="tab" aria-label="快捷键" aria-controls="panel-control" aria-selected="false" tabindex="-1" data-mode="control"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v10a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V7Z"/></svg><span>快捷</span></button>
+        <button id="tab-remote" role="tab" aria-label="电视遥控器" aria-controls="panel-remote" aria-selected="false" tabindex="-1" data-mode="remote"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="5"/><circle cx="12" cy="9" r="3"/><path d="M10 16h4M10 19h4"/></svg><span>遥控</span></button>
       </nav>
       <button id="release" class="release" disabled title="释放所有按键" aria-label="释放所有按键">释放</button>
     </div>

@@ -16,6 +16,7 @@ use axum::{
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, post},
+    serve::ListenerExt,
 };
 use futures_util::SinkExt;
 use serde::{Deserialize, Serialize};
@@ -253,17 +254,24 @@ pub async fn serve(settings: Settings) -> Result<()> {
         }
     });
     let shutdown_state = state.clone();
-    let result = axum::serve(listener, router)
-        .with_graceful_shutdown(async move {
-            if let Err(error) = crate::shutdown_signal().await {
-                tracing::error!(%error, "shutdown signal handler failed");
+    let result = axum::serve(
+        listener.tap_io(|socket| {
+            if let Err(error) = socket.set_nodelay(true) {
+                tracing::warn!(%error, "could not enable TCP_NODELAY on accepted connection");
             }
-            let _ = shutdown_state.stopping.send(true);
-            let mut owner = shutdown_state.owner.lock().await;
-            *owner = None;
-            shutdown_state.release().await;
-        })
-        .await;
+        }),
+        router,
+    )
+    .with_graceful_shutdown(async move {
+        if let Err(error) = crate::shutdown_signal().await {
+            tracing::error!(%error, "shutdown signal handler failed");
+        }
+        let _ = shutdown_state.stopping.send(true);
+        let mut owner = shutdown_state.owner.lock().await;
+        *owner = None;
+        shutdown_state.release().await;
+    })
+    .await;
     monitor.abort();
     result.context("HTTP server failed")
 }
